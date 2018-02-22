@@ -1,0 +1,188 @@
+---
+title: "STAT646_HW1"
+author: "Aditya Lahiri"
+date: "January 30, 2018"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+# **QUESTION 1**
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(biomaRt)
+listMarts()
+listDatasets(useMart("ensembl"))
+mart <- useMart(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
+```
+
+## PART A
+Get the CDNA Sequence                                                            
+```{r}
+CDNA_Seq=getSequence(id="SPRR4",type="hgnc_symbol",seqType="cdna",mart=mart)       
+print(paste("The cDNA sequence for HGNC symbol SPRR4 is:",toString(CDNA_Seq[1])))                               
+```
+
+Get the Peptide sequence                                                         
+```{r}
+Peptide_Seq=getSequence(id="SPRR4",type="hgnc_symbol",seqType="peptide",mart=mart) 
+print(paste("The peptide sequence for HGNC symbol SPRR4 is:",toString(Peptide_Seq[1])))                            
+```
+
+## PART B
+Get the Entrez ID of SPRR4                                                       
+```{r}
+my_results <- getBM(attributes = c("hgnc_symbol", "entrezgene"),                   
+                    mart = mart)                                                     
+index_entrez <- which(my_results$hgnc_symbol=="SPRR4")                               
+entrez_id <- my_results$entrezgene[index_entrez]                                   
+print(paste("The entrezid is:",toString(entrez_id)))                                                            
+```
+## PART C
+```{r include=FALSE}
+library(org.Hs.eg.db)
+```
+```{r}
+GO<-mget(toString(entrez_id),org.Hs.egGO)
+print("The following is the information derived from GO database:")
+print(GO)
+```
+SPRR4 is involved in UV-induced cronification, structural molecule activity, keratinization, keratinocyte differentiation, and
+peptide cross linking. SPRR4 is present in the cytoplasm, cornified envelope and cell cortex. [1]-[2]
+
+
+
+# **QUESTION 2**
+
+## PART A
+BRCA1 is a tumor supressor gene present in cells in the breasts and other parts of the human body. Its primary purpose it stop uncontrolled cell division and repair damaged DNA. Mutation in BRCA1 are associated with breast cancer as it can halt the process
+of DNA repair in the breast and cause a propagation of fault in the cells or it can cause uncontrolled cell division in the breast,
+both of which can lead to breast cancer. Not all mutations in the BRCA1 gene will lead to breast cancer. Certain inherited mutations in the BRCA1 gene has been linked with breast cancer. Among the 12% of women who develop breast cancer in the general 
+population about 55-65% will inherit a harmful mutation in their BRCA1 gene. There are further evidence that links BRCA1 mutations
+to breast cancer in the literature. [3]-[4]
+
+## PART B
+```{r include = FALSE}
+library("hgu133a.db")
+```
+```{r}
+affy_symb <- hgu133aSYMBOL
+mapped_probes <- mappedkeys(affy_symb)
+xx<- as.list(affy_symb[mapped_probes])
+matchedprobes <- mapped_probes[xx =="BRCA1"]
+print("The matched probes are:")
+matchedprobes
+```
+
+## PART C
+
+```{r include=FALSE}
+library(KEGG.db)
+library(org.Hs.eg.db)
+```
+
+```{r}
+gene_Symbol <- "BRCA1"
+EIDS <- mget(gene_Symbol, org.Hs.egSYMBOL2EG, ifnotfound = NA)
+kegg <- mget(toString(EIDS), KEGGEXTID2PATHID, ifnotfound = list(NA))
+print("The pathway in which BRCA1 is involved in is:")
+print(KEGGPATHID2NAME$"04120")
+```
+
+## PART D
+```{r}
+BRCA1_EIDs = KEGGPATHID2EXTID$hsa04120
+BRCA1_symbols = mget(BRCA1_EIDs, org.Hs.egSYMBOL, ifnotfound = NA)
+Other_genes <-unlist(BRCA1_symbols)
+print("The other genes in the pathway are:")
+Other_genes
+```
+
+
+## PART E
+Performing the gene enrichment in the code below
+```{r include = FALSE}
+library(topGO)
+```
+
+```{r}
+gene_universe <- xx  ## Gene Universe
+kegg_genes =list()   ## Kegg Pathway Genes
+kegg_genes =list(Other_genes[-1:-2]) ## Get rid of the NA values in the start of the list
+position_match <- match(kegg_genes[[1]], gene_universe[])
+position_match<- position_match[!is.na(position_match)]
+gene_score <- rep(0, length(gene_universe))  
+gene_score[position_match]=1 ## Score of 1 is given to genes in gene_universe if they are present in the kegg pathway
+affyLib <- paste("hgu133a", "db", sep = ".")
+```
+
+```{r include= FALSE}
+library(affyLib, character.only = TRUE)
+```
+
+```{r}
+gene_universe_XX= gene_universe# Creating a seperate dummy variable for gene_universe
+for (iter in 1:length(gene_universe_XX)){ gene_universe_XX[[iter]]=gene_score[iter]} #assign scores of 0 and 1 to genes
+gene_universe_XX<- unlist(gene_universe_XX)
+
+top_genes <- function(allscore){
+  return(allscore==1)
+}
+
+sampleGOdata <- new("topGOdata",
+                      description = "Simple session", ontology= "BP",
+                      allGenes = gene_universe_XX, geneSel = top_genes,
+                      nodeSize = 10,
+                      annot = annFUN.db, affyLib = affyLib)
+enrichment_Fisher <- runTest(sampleGOdata, algorithm = "classic", statistic = "fisher")
+enrichment_Fisher
+```
+
+
+### i) The number of genes with p<0.001 is:
+```{r}
+scores_Fisher = score(enrichment_Fisher)
+print(length(scores_Fisher[scores_Fisher <0.001 ]))
+```
+
+
+### ii) The most enriched gene is:
+```{r}
+most_enriched <- scores_Fisher[scores_Fisher == min(scores_Fisher)]
+print(names(most_enriched[1]))
+```
+This gene describes a biological process (BP). This gene is involved in the pathway of
+"protien modification by small protient conjugation." This gene plays a role in attaching
+ubiquitin or ubiquitin like protiens to a target protien [5]. This gene doesn't have any other
+associated ids as per online literature and the code below which tries to retrieve it entrez id.
+This pathway is different from the pathway of BRCA1 which is Ubiquitin mediated proteolysis but,
+it may have some cross talk or overlap since this gene targets protiens such as ubiquitin. 
+```{r}
+#Enriched_EID <- unlist(mget(names(most_enriched[1]),  org.Hs.egGO2EG))
+#Enriched_EID <- c(Enriched_EID[[1]],Enriched_EID[[2]])
+#kegg_Enriched <- mget(Enriched_EID, KEGGEXTID2PATHID, ifnotfound = list(NA))
+
+```
+
+```{r}
+sessionInfo()
+
+```
+
+# CITATIONS
+[1]Uniprot.org. (2018). SPRR4 - Small proline-rich protein 4 - Homo sapiens (Human) - SPRR4 gene & protein. [online] Available at:    http://www.uniprot.org/uniprot/Q96PI1 [Accessed 10 Feb. 2018].
+
+[2]Ncbi.nlm.nih.gov. (2018). SPRR4 small proline rich protein 4 [Homo sapiens (human)] - Gene - NCBI. [online] Available at:         https://www.ncbi.nlm.nih.gov/gene?Db=gene&Cmd=DetailsSearch&Term=163778 [Accessed 10 Feb. 2018].
+
+[3]Reference, G. (2018). BRCA1 gene. [online] Genetics Home Reference. Available at: https://ghr.nlm.nih.gov/gene/BRCA1 [Accessed    10 Feb. 2018].
+
+[4]National Cancer Institute. (2018). BRCA Mutations: Cancer Risk & Genetic Testing. [online] Available at:                          https://www.cancer.gov/about-cancer/causes-prevention/genetics/brca-fact-sheet [Accessed 10 Feb. 2018].
+
+[5]Consortium, G. (2018). AmiGO 2: Term Details for "protein modification by small protein conjugation" (GO:0032446). [online]       Amigo.geneontology.org. Available at: http://amigo.geneontology.org/amigo/term/GO:0032446 [Accessed 10 Feb. 2018].
+
+
+
+
+
+          
