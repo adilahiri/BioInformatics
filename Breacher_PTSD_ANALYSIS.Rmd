@@ -1,0 +1,215 @@
+---
+title: "HW2 PART 2"
+author: "Aditya Lahiri"
+date: "February 27, 2018"
+output:
+  word_document: default
+  pdf_document: default
+---
+## STEP 1
+```{r}
+
+options(stringsAsFactors = FALSE)
+X<-read.csv("Phenotype_Breacher_HM450.csv",sep=",");rownames(X)<-X[,1];X<-X[,-1]
+X<-X[-c(61,62,63,64,68,69,70,71,72),]
+## collecting samples only for pre-explosion
+baseline<-X[X$sample==1,]
+### removing samples "3X01_1", "3X02_2"
+
+baseline<-baseline[-c(26,32),]
+
+#####  Need to correct the format of the categories for column named "X..career..breaches". After correcting the column create the bar plot. re-categorize the column as "<39"  and ">39" and draw the piechart
+
+replace(baseline$X..career..breaches, baseline$X..career..breaches=="1/9/2016", "1-9")
+require("car")
+career<-recode(baseline$X..career..breaches, "c('40-99','100-199','200-399','400+')='>39'; else='<39'")
+
+```
+
+## STEP 2
+Bar Plot
+```{r}
+breaches<-factor(baseline$X..career..breaches)
+breaches = factor(breaches,levels(breaches)[c(1:3,6,4,5,7)])
+levels(breaches)<-c("0" ,"1-9", "10-39", "40-99", "100-199", "200+", "200+")
+plot(barplot(table(breaches), xlab="age-categories", ylab = "# breaches",main ="# breaches bar plot"))
+```
+Pie Chart
+```{r}
+slices<-c(2100/32,900/32)
+lbls <- slices
+lbls<- paste(lbls,"%",sep="")
+pie(slices,labels=lbls, col=rainbow(length(lbls)),main="Pie Chart",cex=0.8)
+legend("topright",c("< 39","> 39"), cex=0.8, fill =rainbow(length(lbls)))
+```
+Divided Bar Plot
+```{r}
+counts <- table(baseline$hx.of.TBI,breaches)
+barplot(counts,xlab = "# of breachers", col=c("red","black"), legend=c("TBI=no","TBI=yes"), ylim=c(0,15))
+```
+
+
+```{r, include=FALSE}
+library(minfi)
+library(limma)
+```
+## Dendogram for sample mixup plot
+```{r}
+load("rgset_breacher.Rdata")
+rgset<-valid_RGset
+# removing the samples and subset the data for pre-explosion. end of this step youshould have 30 samples and all of them are from pre-explosion category.
+rgset_reduced<-rgset[,-c(61,62,63,64,68,69,70,71,72)];
+rgset_baseline<-rgset_reduced[,-which(c(seq(1,63)) %% 2 == 0)]
+#### creating the pheotype data from the rgset data
+pheno<-pData(rgset_baseline); dim(pheno);
+# changing the column names of rgset channel data to sample names of phenotype
+colnames(rgset_baseline)<-pheno$Sample_Name
+snps <- getSnpBeta(rgset_baseline); colnames(snps); match(colnames(snps),paste0(pheno$Slide,"_",pheno$Array));
+colnames(snps)<-pheno[,1]; colnames(snps);
+x<-dist(t(snps), method = "manhattan");
+hc<-hclust(x, method = "single");
+plot(hc,main="Dendrogram") # Not the same as pdf
+```
+
+
+## Data preprocessing or normalization
+```{r}
+## preprocessing and normalization. preprocessRaw doesn't perform any kind of normalization. preprocessSWAN
+# does Subset-quantile within Array Normalization
+mset_baseline<-preprocessRaw(rgset_baseline);
+msetillumina_baseline<-preprocessIllumina(rgset_baseline, bg.correct = TRUE, normalize = "controls")
+msetsw_baseline<-preprocessSWAN(rgset_baseline, msetillumina_baseline)
+####filter out poor quality probes
+detP <- detectionP(rgset_baseline)
+keep <- rowSums(detP < 0.01) == ncol(rgset_baseline)
+mSetSw_baseline <- msetsw_baseline[keep,]
+par(mfrow=c(1,2), cex= 0.75)
+plotBetasByType(mset_baseline[,1], main = "Raw")
+plotBetasByType(msetsw_baseline[,1], main = "SWAN")
+```
+
+## Data Analysis for baseline only
+```{r}
+##extracting beta and M values -----------------------
+beta_baseline <- getBeta(mSetSw_baseline)
+Mval_baseline <-getM(mSetSw_baseline)
+###differential methylation using limma for pre-explosion samples only-------------------------
+###first matching the order of the samples between file named baseline and file named pheno
+baseline<-baseline[order(rownames(baseline),pheno$Sample_Name),]
+
+require("car")
+career_new<-recode(baseline$X..career..breaches, "c('40-99','100-199','200-399','400+')='high'; else='low'")
+
+career_breacher <- factor(career_new,levels=c("low","high"))
+historyTBI <- factor(baseline$hx.of.TBI,levels=c("yes","no"))
+design <- model.matrix(~pheno$age + career_breacher + historyTBI)
+fit<- lmFit(Mval_baseline,design)
+fit.reduced <- eBayes(fit)
+
+####### top table of coefficient  for high vs low breaching
+top_breacher<-topTable(fit.reduced,coef=3,number=dim(Mval_baseline)[1])
+pos<-which(top_breacher$P.Value<0.05)
+fc_breacher<-top_breacher$logFC[pos]
+fcbreacherplus<-fc_breacher[fc_breacher>0]
+fcbreacherminus<-abs(fc_breacher[fc_breacher<=0])
+
+plot.new()
+plot.window(ylim = c(-2000, 2000), xlim = range(c(fcbreacherplus,fcbreacherminus)))
+p1 <- list(axes = FALSE, xlab = "methylation M-value difference", ylab = "# of CpGs", main = "Breach: low vs high",col = "red", border ="black")
+p2 <- list(axes = FALSE, xlab = "methylation M-value difference", ylab = "# of CpGs", main = "Breach: low vs high",col = "blue", border = "black")
+par(new=TRUE)
+do.call(hist, c(list(x = fcbreacherplus, ylim = c(-2000, 2000)), p1,breaks=25))
+par(new=TRUE)
+do.call(hist, c(list(x = fcbreacherminus, ylim = c(2000, -2000)), p2,breaks=25))
+axis(side = 2, 
+      at = pretty(par()$usr[3:4]), 
+     labels = abs(pretty(par()$usr[3:4])))
+axis(side = 1) 
+```
+
+```{r}
+####### top table of coefficient  for history of TBI
+top_TBI<-topTable(fit.reduced,coef=4,number=dim(Mval_baseline)[1])
+pos<-which(top_TBI$P.Value<0.05)
+
+fc_TBI<-top_TBI$logFC[pos]
+fcTBIplus<-fc_TBI[fc_TBI>0]
+fcTBIminus<-abs(fc_TBI[fc_TBI<=0])
+
+plot.new()
+plot.window(ylim = c(-2000, 2000), xlim = range(c(fcTBIplus,fcTBIminus)))
+p1 <- list(axes = FALSE, xlab = "methylation M-value difference", ylab = "# of CpGs", main = "TBI: no vs yes",col = "red", border ="black")
+p2 <- list(axes = FALSE, xlab = "methylation M-value difference", ylab = "# of CoGs", main = "TBI: no vs yes",col = "blue", border = "black")
+par(new=TRUE)
+do.call(hist, c(list(x = fcTBIplus, ylim = c(-2000, 2000)), p1,breaks=25))
+par(new=TRUE)
+do.call(hist, c(list(x = fcTBIminus, ylim = c(2000, -2000)), p2,breaks=25))
+axis(side = 2, 
+      at = pretty(par()$usr[3:4]), 
+     labels = abs(pretty(par()$usr[3:4])))
+axis(side = 1) 
+```
+
+```{r}
+### Accessing annotation for Illumina methylation objects
+annotation<-getAnnotation(rgset_baseline)
+positioninfo<-annotation$UCSC_RefGene_Group
+probename<-annotation$Name
+selected_cpgsitebreacher <-rownames(top_breacher)
+selected_probe<-which(probename  %in%selected_cpgsitebreacher )
+position_selected<-positioninfo[selected_probe]
+
+
+annotation<-getAnnotation(rgset_baseline)
+Islandinfo<-annotation$Relation_to_Island
+Islandinfo_selected<-Islandinfo[selected_probe]
+countIsland=sum(grepl("Island",Islandinfo_selected))
+countNShelf=sum(grepl("N_Shelf",Islandinfo_selected))
+countNShore=sum(grepl("N_Shore",Islandinfo_selected))
+countSShore=sum(grepl("S_Shore",Islandinfo_selected))
+countSShelf=sum(grepl("S_Shelf",Islandinfo_selected))
+countSOpenSea=sum(grepl("OpenSea",Islandinfo_selected))
+cate_island = c("Island","N_Shelf","N_Shore","OpenSea","S_Shelf", "S_Shore");
+cnt_island=c(countIsland,countNShelf,countNShore,countSOpenSea,countSShore,countSShelf)
+names(cnt_island)=cate_island
+barplot(cnt_island, xlab="categories of Island Name", ylab="",main="Barplot for Island Name")
+
+
+
+position_selected<-positioninfo[selected_probe]
+countTSS=sum(grepl("TSS",position_selected))
+count5UTR=sum(grepl("5'UTR",position_selected))
+countbody=sum(grepl("Body",position_selected))
+countexon=sum(grepl("1stExon",position_selected))
+cate = c("TSS","body","1stExon","5'UTR");
+cnt=c(countTSS,countbody,countexon,count5UTR)
+names(cnt)=cate
+barplot(cnt, xlab="categories of region", ylab="",main="Barplot for regions") 
+
+```
+
+
+```{r}
+##-------------------------------beta value box plot for low Vs high breaches------------------------
+beta<-beta_baseline
+mean_beta<-apply(beta,2,mean)
+boxplot(mean_beta~career, col=c("gold","darkgreen"),xlab="", ylab="beta values")
+
+
+```
+```{r}
+##--------volcano polt--------------------
+#png(file = "volcano.png")
+par(mar=c(3,3,2,1), mgp=c(2,.7,0), tck=-.01)
+plot(top_breacher$logFC, -log10(top_breacher$P.Value),xlab="top_breacher$logFC", ylab="-log10p-value")
+abline(a=-log10(0.05), b=0, col="red")
+
+```
+
+
+
+
+
+
+
+
