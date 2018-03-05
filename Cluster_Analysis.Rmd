@@ -1,0 +1,321 @@
+---
+title: "HW2_PART1"
+author: "Aditya Lahiri"
+date: "February 18, 2018"
+output:
+  word_document: default
+  html_document: default
+---
+# QUESTION 1 
+
+Read the raw data first. and preprocess the data 
+```{r}
+dta_69284 = read.delim("69284.txt", skip = 17, header = T)
+dta_02340 = read.delim("2340.txt", skip = 17, header = T)
+dta_33091 = read.delim("33091.txt", skip = 18, header = T)
+dta_69976 = read.delim("69976.txt", skip = 19, header = T)
+dta_69971 = read.delim("69971.txt", skip = 19, header = T)
+dta_69973 = read.delim("69973.txt", skip = 19, header = T)
+dta_64995 = read.delim("64995.txt", skip = 17, header = T)
+dta_48033 = read.delim("48033.txt", skip = 17, header = T)
+dta_48035 = read.delim("48035.txt", skip = 17, header = T)
+dta_69980 = read.delim("69980.txt", skip = 19, header = T)
+dta_69977 = read.delim("69977.txt", skip = 19, header = T)
+dta_69972 = read.delim("69972.txt", skip = 19, header = T)
+dta_48038 = read.delim("48038.txt", skip = 17, header = T)
+dta_64992 = read.delim("64992.txt", skip = 17, header = T)
+dta_69659 = read.delim("69659.txt", skip = 17, header = T)
+dta_69974 = read.delim("69974.txt", skip = 19, header = T)
+dta_70239 = read.delim("70239.txt", skip = 19, header = T)
+dta_65000 = read.delim("65000GENEPIX0.txt", skip = 0, header = T)
+dta_65003 = read.delim("65003.txt", skip = 17, header = T)
+dta_33093 = read.delim("33093.txt", skip = 18, header = T)
+dta_48031 = read.delim("48031.txt", skip = 17, header = T)
+dta_69979 = read.delim("69979.txt", skip = 19, header = T)
+dta_69981 = read.delim("69981.txt", skip = 19, header = T)
+```
+
+Meta data
+```{r}
+n = 23
+meta = data.frame("strain" = rep(NA, n), "tech" = rep(NA, n), "year" = rep(NA, n))
+meta$strain = c("control", "ale", "control", rep("fuel", 3), "bakers", "wine", "wine", 
+  rep("fuel", 3), "wine", "bakers", "control", "fuel", "fuel", "bakers", "bakers", 
+  "control", "wine", "fuel", "fuel")
+meta$tech = c("dunn", rep("unknown", 2), rep("stambuk", 3), rep("dunn", 3), 
+  rep("stambuk", 3), rep("dunn", 3), rep("stambuk", 2), "dunn", "dunn", "unknown", 
+  "dunn", rep("stambuk", 2))
+meta$year = c(2006, 1999, "unknown", rep(2006, 3), 2005, 2004, 2004, rep(2006, 3), 2004, 
+  2005, rep(2006, 3), 2005, 2005, "unknown", 2004, 2006, 2006)
+```
+
+```{r}
+keep_ii = (1:n)[-c(2, 3, 20)]
+meta = meta[keep_ii, ]; rownames(meta) = 1:20
+n = 20
+
+## Not all arrays have the same features on them. Let's find and keep only the 
+## features that are shared across all arrays.
+all_spots = table(c(dta_69284[,1], dta_69976[,1], dta_69971[,1], dta_69973[,1], 
+  dta_64995[,1], dta_48033[,1], dta_48035[,1], dta_69980[,1], dta_69977[,1], 
+  dta_69972[,1], dta_48038[,1], dta_64992[,1], dta_69659[,1], dta_69974[,1],
+  dta_70239[,1], dta_65000[,1], dta_65003[,1], dta_48031[,1], dta_69979[,1],
+  dta_69981[,1]))
+uniq_spots = as.numeric(names(all_spots))
+shared_ii = (1:length(uniq_spots))[all_spots == n]
+shared_spots = uniq_spots[shared_ii]
+m_shared = length(shared_spots)
+
+## Keep only the data for the shared features. Leaves m = 6740 features.
+dta_69284 = dta_69284[dta_69284[, 1] %in% shared_spots, ]
+dta_69976 = dta_69976[dta_69976[, 1] %in% shared_spots, ]
+dta_69971 = dta_69971[dta_69971[, 1] %in% shared_spots, ]
+dta_69973 = dta_69973[dta_69973[, 1] %in% shared_spots, ]
+dta_64995 = dta_64995[dta_64995[, 1] %in% shared_spots, ]
+dta_48033 = dta_48033[dta_48033[, 1] %in% shared_spots, ]
+dta_48035 = dta_48035[dta_48035[, 1] %in% shared_spots, ]
+dta_69980 = dta_69980[dta_69980[, 1] %in% shared_spots, ]
+dta_69977 = dta_69977[dta_69977[, 1] %in% shared_spots, ]
+dta_69972 = dta_69972[dta_69972[, 1] %in% shared_spots, ]
+dta_48038 = dta_48038[dta_48038[, 1] %in% shared_spots, ]
+dta_64992 = dta_64992[dta_64992[, 1] %in% shared_spots, ]
+dta_69659 = dta_69659[dta_69659[, 1] %in% shared_spots, ]
+dta_69974 = dta_69974[dta_69974[, 1] %in% shared_spots, ]
+dta_70239 = dta_70239[dta_70239[, 1] %in% shared_spots, ]
+dta_65000 = dta_65000[dta_65000[, 1] %in% shared_spots, ]
+dta_65003 = dta_65003[dta_65003[, 1] %in% shared_spots, ]
+dta_48031 = dta_48031[dta_48031[, 1] %in% shared_spots, ]
+dta_69979 = dta_69979[dta_69979[, 1] %in% shared_spots, ]
+dta_69981 = dta_69981[dta_69981[, 1] %in% shared_spots, ]
+
+m = 6740
+
+## Pull out median intensities by channel, log transform.  
+Y_1 = log2(cbind(dta_69284[,46], dta_69976[,45], dta_69971[,45], dta_69973[,45], 
+  dta_64995[,45], dta_48033[,45], dta_48035[,45], dta_69980[,45], dta_69977[,45], 
+  dta_69972[,45], dta_48038[,45], dta_64992[,45], dta_69659[,45], dta_69974[,45], 
+  dta_70239[,45], dta_65000[,45], dta_65003[,45], dta_48031[,45], dta_69979[,45], 
+  dta_69981[,45]))
+  
+Y_2 = log2(cbind(dta_69284[,51], dta_69976[,50], dta_69971[,50], dta_69973[,50], 
+  dta_64995[,50], dta_48033[,50], dta_48035[,50], dta_69980[,50], dta_69977[,50], 
+  dta_69972[,50], dta_48038[,50], dta_64992[,50], dta_69659[,50], dta_69974[,50], 
+  dta_70239[,50], dta_65000[,50], dta_65003[,50], dta_48031[,50], dta_69979[,50], 
+  dta_69981[,50]))
+  
+## Differences in log median intensity between 2 channels.
+Y = Y_2 - Y_1 ## FINAL DATA MATRIX FOR CLUSTERING 
+```
+## PART A
+```{r}
+hh_avg = hclust(dist(t(Y)), method = "average")
+hh_com = hclust(dist(t(Y)), method = "complete")
+hh_sig = hclust(dist(t(Y)), method = "single")
+dist_avg = min(hh_avg$height)
+dist_com = min(hh_com$height)
+dist_sig = min(hh_sig$height)
+First_Merge_Avg=hh_avg$merge[1,]
+First_Merge_com=hh_com$merge[1,]
+First_Merge_sig=hh_sig$merge[1,]
+```
+i. 
+
+Under average linkage the samples merged first are:
+```{r}
+print(abs(First_Merge_Avg))
+```
+The distance between these two samples is:
+```{r}
+print(dist_avg)
+```
+Under complete linkage the samples merged first are:
+```{r}
+print(abs(First_Merge_com))
+```
+The distance between these two samples is:
+```{r}
+print(dist_com)
+```
+
+Under single linkage the samples merged first are:
+```{r}
+print(abs(First_Merge_sig))
+```
+The distance between these two samples is:
+```{r}
+print(dist_sig)
+```
+
+
+ii.
+
+The height plot for average linkage is below, the number of clusters are 3. There are 2 points that are seperated by large distance between each other and all the other points in graph. Thus there are three clusters. 
+```{r}
+plot(hh_avg)
+plot(hh_avg$height)
+meta[c(11,1,7,6,18),]
+meta[c(16,14,15,19,2,9),]
+meta[c(20,8,3,10),]
+```
+
+The height plot for complete linkage is below, the number of clusters are 2. There is 1 point that is seperated by large distance from all the other points in graph. Thus there are two clusters.
+```{r}
+plot(hh_com)
+plot(hh_com$height)
+meta[c(11,7,6,18),]
+meta[c(5,12,1,13),]
+```
+The height plot for single linkage is below, the number of clusters are 2. There is 1 point that is seperated by large distance from all the other points in graph. Thus there are two clusters.
+```{r}
+plot(hh_sig)
+plot(hh_sig$height)
+meta[c(11),]
+meta[c(1,7,6,18),]
+ meta[c(20,13,5,12,8,4,15,16,17,15,19,2,9,3,10),]
+
+```
+
+iii.
+Average Linkage:
+The baker strain prepared by dunn in 2005 is similar to fuel strain prepared by stambu in 2006.
+The fuel strain prepared by stambuck in 2006 is different from wine strain prepared by dunn in 2004.
+
+Complete Linkage:
+The wine strain prepared by dunn in 2004 is different from  the fuel strain prepared by stambuck in 2006.
+
+Single Linkage:
+A wine strain prepared by dunn in 2004 is different from other wine strain prepared by dunn in 2004 and other strains 
+prepared by dunn and stambuk in 2005 and 2006.
+
+## PART B
+
+```{r}
+K_Means= kmeans(Y,3)
+plot(Y[,1],Y[,2],col=K_Means$cluster)
+plot(hh_avg)
+```
+
+There are 3  clusters in both the average linkage and K means method. In both the methods 
+of analysis we see of the 3 clusters formed of which  2 clusters are close but one of the cluster
+is far apart from these 2 clusters.
+
+
+# Question 2
+
+```{r}
+data = read.delim("GDS4308.soft", skip = 97,skipNul=TRUE)[-54676, ]
+gene_id <- data[, 1:2]
+data = data[, -c(1:2)]
+data<-na.omit(data)
+data_new<-apply(data,2,as.numeric)
+data_final<-log2(data_new)
+D <- data_final[, 1:5] - data_final[, 6:10]
+colnames(D) <- 1:5
+m<-ncol(data_final)
+```
+
+Part A
+```{r}
+HC <- hclust(dist(t(D)), method = "complete")
+plot(HC)
+plot(HC$height)
+```
+From the height plot we see that one point on the top right is sperated from the rest of the points by quite a lot of distance. The other points are quite close by, hence I would say that there are two clusters formed ie. cluster containing data point 3 and another cluster containing data points 1,2,4, and 5.
+Part B
+```{r}
+S<-var(D)
+egn_S<-eigen(S)
+PCA<-prcomp(na.omit(D))
+PCA
+summary(PCA)
+```
+
+Part C
+```{r}
+D_centered <- scale(D, center = TRUE, scale = FALSE)
+svd_Dcent<- svd(D_centered)
+
+```
+
+From eigen value decomposition we know that PCA and SVD are related by the equation:
+(n-1) . Covariance Matrix = U .D^2 . Transpose(U)
+or the eigen values of the covariance is = square of the sigular values from SVD 
+So lets verify this by using the following: 
+```{r}
+n<-nrow(D)
+
+egn_S$values
+
+svd_Dcent$d^2/(n-1)
+
+
+```
+We see that we get back the eigen values
+
+Now let's see if we can get the PC's from SVD
+
+```{r}
+svd_Dcent$v
+
+PCA$rotation # from previous section
+```
+We see that PCs match our results from SVD. 
+
+
+
+Part D
+
+```{r}
+## Compute t-statistics to test whether the mean paired differences equal 0.
+
+## Compute t-statistics to test whether the mean paired differences equal 0.
+
+t_stats <- apply(D, 1, function(x) { t.test(x)$statistic })
+
+## Bootstrap for statistical significance.
+
+set.seed(101)
+B <- 100# Hundred samples
+p_vals <- numeric(m)
+num_na_t <- numeric(m)
+for(i in 1:m) {
+  if(i == ((i %/% 1000) * 1000))
+    cat(i)
+  
+  ## To approximate the sampling distribution of the test statistic under the null
+  ## hypothesis, we resample after centering to force the mean to be 0.
+  d_i_centered <- D[i, ] - mean(D[i, ])#mean centering
+  t_b <- rep(NA, B)#empty vector
+  for(b in 1:B) {#sample with replacement from D Centered vector with replacement
+    d_b <- sample(d_i_centered, replace = TRUE)
+    ## If possible, compute t-statistic.
+    if(length(unique(d_b)) > 1)
+      t_b[b] <- t.test(d_b)$statistic # calculate T statistic for unique sample vectors
+  }
+  is_na_t <- is.na(t_b) #find NA
+  num_na_t[i] <- sum(is_na_t)
+  t_b_b <- t_b[!is_na_t]#Remove the NA
+  p_vals[i] <- sum(abs(t_b[!is_na_t]) >= abs(t_stats[i])) / (B - num_na_t[i])  #Compute the P values	
+}
+hist(p_vals)
+fdr <- p.adjust(p_vals, method = "fdr")
+## Using t-based p-values.
+t_pvals <- apply(D, 1, function(x) { t.test(x)$p.value })
+hist(t_pvals)
+
+fivenum(p.adjust(t_pvals, method = "fdr"))
+
+
+
+
+
+```
+
+Above we can see the two histograms computed using bootstrap and t statistic According to the histogram obtained via t statistic method there are some significant P values but this is misleading as we assume normality in the data, which is an incorrect assumption. We know this assumption is incorrect by looking at the histogram obtained from bootstrap which doesnt find these significant p-values.  
+
+The number of significant features at FDR = 0.05 are:
+```{r}
+n_sig<-length(which(fdr <=0.05))
+
+n_sig
+```
